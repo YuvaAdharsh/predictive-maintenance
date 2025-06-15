@@ -186,11 +186,21 @@ class NurogensisSystem {
             }
         });
 
-        // Sensor Chart with fixed dataset size
+        // Sensor Chart with equipment-based data
         const sensorCtx = document.getElementById('sensorChart').getContext('2d');
         this.sensorDataPoints = Array.from({length: 20}, (_, i) => i + 1);
-        this.temperatureData = this.generateRandomData(20, 70, 100);
-        this.vibrationData = this.generateRandomData(20, 1, 5);
+        
+        // Initialize with current equipment data or zeros
+        if (this.equipmentData.length > 0) {
+            const avgTemp = this.equipmentData.reduce((sum, eq) => sum + eq.temperature, 0) / this.equipmentData.length;
+            const avgVibration = this.equipmentData.reduce((sum, eq) => sum + eq.vibration, 0) / this.equipmentData.length;
+            
+            this.temperatureData = Array.from({length: 20}, () => avgTemp + (Math.random() - 0.5) * 10);
+            this.vibrationData = Array.from({length: 20}, () => avgVibration + (Math.random() - 0.5) * 1);
+        } else {
+            this.temperatureData = Array(20).fill(0);
+            this.vibrationData = Array(20).fill(0);
+        }
         
         this.charts.sensor = new Chart(sensorCtx, {
             type: 'line',
@@ -241,25 +251,36 @@ class NurogensisSystem {
             }
         });
 
-        // Prediction Chart
+        // Prediction Chart with dynamic data based on equipment
         const predictionCtx = document.getElementById('predictionChart').getContext('2d');
+        const initialPredictedFailures = this.calculatePredictedFailures();
+        const initialMaintenanceScheduled = this.calculateMaintenanceScheduled();
+        
         this.charts.prediction = new Chart(predictionCtx, {
             type: 'bar',
             data: {
                 labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
                 datasets: [{
                     label: 'Predicted Failures',
-                    data: [2, 1, 3, 1],
+                    data: initialPredictedFailures,
                     backgroundColor: '#e74c3c'
                 }, {
                     label: 'Maintenance Scheduled',
-                    data: [5, 3, 4, 6],
+                    data: initialMaintenanceScheduled,
                     backgroundColor: '#f39c12'
                 }]
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: false
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        }
+                    }
+                }
             }
         });
     }
@@ -274,6 +295,43 @@ class NurogensisSystem {
 
     generateRandomData(count, min, max) {
         return Array.from({length: count}, () => Math.random() * (max - min) + min);
+    }
+
+    calculatePredictedFailures() {
+        if (this.equipmentData.length === 0) {
+            return [0, 0, 0, 0]; // No equipment, no failures
+        }
+        
+        // Calculate predicted failures based on equipment health
+        const criticalEquipment = this.equipmentData.filter(eq => eq.health < 60).length;
+        const warningEquipment = this.equipmentData.filter(eq => eq.health < 80 && eq.health >= 60).length;
+        
+        // Simulate weekly prediction based on current equipment status
+        const week1 = Math.max(0, Math.floor(criticalEquipment * 0.8 + warningEquipment * 0.2));
+        const week2 = Math.max(0, Math.floor(criticalEquipment * 0.5 + warningEquipment * 0.3));
+        const week3 = Math.max(0, Math.floor(criticalEquipment * 0.3 + warningEquipment * 0.4));
+        const week4 = Math.max(0, Math.floor(criticalEquipment * 0.2 + warningEquipment * 0.2));
+        
+        return [week1, week2, week3, week4];
+    }
+
+    calculateMaintenanceScheduled() {
+        if (this.equipmentData.length === 0) {
+            return [0, 0, 0, 0]; // No equipment, no maintenance
+        }
+        
+        // Calculate maintenance based on equipment status and health
+        const maintenanceDue = this.equipmentData.filter(eq => eq.status === 'Maintenance Due').length;
+        const totalEquipment = this.equipmentData.length;
+        
+        // Simulate scheduled maintenance over 4 weeks
+        const baseRate = Math.max(1, Math.floor(totalEquipment / 4));
+        const week1 = maintenanceDue + baseRate;
+        const week2 = Math.max(0, baseRate - 1);
+        const week3 = baseRate + Math.floor(Math.random() * 2);
+        const week4 = baseRate + Math.floor(Math.random() * 3);
+        
+        return [week1, week2, week3, week4];
     }
 
     updateSensorDisplay() {
@@ -439,20 +497,40 @@ class NurogensisSystem {
             this.charts.health.update();
         }
 
-        // Update sensor chart with sliding window (fixed size)
+        // Update sensor chart based on actual equipment data
         if (this.charts.sensor) {
-            // Shift data to the left and add new data point
-            this.temperatureData.shift();
-            this.vibrationData.shift();
-            
-            // Add new random data points
-            this.temperatureData.push(Math.random() * 30 + 70); // 70-100
-            this.vibrationData.push(Math.random() * 4 + 1); // 1-5
+            if (this.equipmentData.length === 0) {
+                // No equipment - show zero data
+                this.temperatureData = Array(20).fill(0);
+                this.vibrationData = Array(20).fill(0);
+            } else {
+                // Shift data to the left and add new data point based on equipment
+                this.temperatureData.shift();
+                this.vibrationData.shift();
+                
+                // Calculate average sensor values from all equipment
+                const avgTemp = this.equipmentData.reduce((sum, eq) => sum + eq.temperature, 0) / this.equipmentData.length;
+                const avgVibration = this.equipmentData.reduce((sum, eq) => sum + eq.vibration, 0) / this.equipmentData.length;
+                
+                // Add slight variation to the averages for realistic data
+                this.temperatureData.push(avgTemp + (Math.random() - 0.5) * 5);
+                this.vibrationData.push(avgVibration + (Math.random() - 0.5) * 0.5);
+            }
             
             // Update chart data
             this.charts.sensor.data.datasets[0].data = this.temperatureData;
             this.charts.sensor.data.datasets[1].data = this.vibrationData;
             this.charts.sensor.update('none'); // No animation for smoother real-time feel
+        }
+
+        // Update prediction chart based on equipment health
+        if (this.charts.prediction) {
+            const predictedFailures = this.calculatePredictedFailures();
+            const maintenanceScheduled = this.calculateMaintenanceScheduled();
+            
+            this.charts.prediction.data.datasets[0].data = predictedFailures;
+            this.charts.prediction.data.datasets[1].data = maintenanceScheduled;
+            this.charts.prediction.update();
         }
     }
 
@@ -561,6 +639,13 @@ class NurogensisSystem {
     deleteEquipment(index) {
         if (confirm('Are you sure you want to delete this equipment?')) {
             this.equipmentData.splice(index, 1);
+            
+            // If no equipment left, reset sensor data to zeros
+            if (this.equipmentData.length === 0) {
+                this.temperatureData = Array(20).fill(0);
+                this.vibrationData = Array(20).fill(0);
+            }
+            
             this.refreshEquipmentList();
             this.updateDashboard();
             this.updateCharts();
