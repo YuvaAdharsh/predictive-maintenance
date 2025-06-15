@@ -186,103 +186,11 @@ class NurogensisSystem {
             }
         });
 
-        // Sensor Chart with equipment-based data
-        const sensorCtx = document.getElementById('sensorChart').getContext('2d');
-        this.sensorDataPoints = Array.from({length: 20}, (_, i) => i + 1);
-        
-        // Initialize with current equipment data or zeros
-        if (this.equipmentData.length > 0) {
-            const avgTemp = this.equipmentData.reduce((sum, eq) => sum + eq.temperature, 0) / this.equipmentData.length;
-            const avgVibration = this.equipmentData.reduce((sum, eq) => sum + eq.vibration, 0) / this.equipmentData.length;
-            
-            this.temperatureData = Array.from({length: 20}, () => avgTemp + (Math.random() - 0.5) * 10);
-            this.vibrationData = Array.from({length: 20}, () => avgVibration + (Math.random() - 0.5) * 1);
-        } else {
-            this.temperatureData = Array(20).fill(0);
-            this.vibrationData = Array(20).fill(0);
-        }
-        
-        this.charts.sensor = new Chart(sensorCtx, {
-            type: 'line',
-            data: {
-                labels: this.sensorDataPoints.map(point => `${point}m`),
-                datasets: [{
-                    label: 'Temperature',
-                    data: this.temperatureData,
-                    borderColor: '#e74c3c',
-                    backgroundColor: 'rgba(231, 76, 60, 0.1)',
-                    tension: 0.4
-                }, {
-                    label: 'Vibration',
-                    data: this.vibrationData,
-                    borderColor: '#f39c12',
-                    backgroundColor: 'rgba(243, 156, 18, 0.1)',
-                    tension: 0.4
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                animation: {
-                    duration: 750
-                },
-                scales: {
-                    x: {
-                        display: true,
-                        title: {
-                            display: true,
-                            text: 'Time (minutes)'
-                        }
-                    },
-                    y: {
-                        display: true,
-                        title: {
-                            display: true,
-                            text: 'Values'
-                        }
-                    }
-                },
-                plugins: {
-                    legend: {
-                        display: true,
-                        position: 'top'
-                    }
-                }
-            }
-        });
+        // Initialize Sensor Chart
+        this.initializeSensorChart();
 
-        // Prediction Chart with dynamic data based on equipment
-        const predictionCtx = document.getElementById('predictionChart').getContext('2d');
-        const initialPredictedFailures = this.calculatePredictedFailures();
-        const initialMaintenanceScheduled = this.calculateMaintenanceScheduled();
-        
-        this.charts.prediction = new Chart(predictionCtx, {
-            type: 'bar',
-            data: {
-                labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
-                datasets: [{
-                    label: 'Predicted Failures',
-                    data: initialPredictedFailures,
-                    backgroundColor: '#e74c3c'
-                }, {
-                    label: 'Maintenance Scheduled',
-                    data: initialMaintenanceScheduled,
-                    backgroundColor: '#f39c12'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            stepSize: 1
-                        }
-                    }
-                }
-            }
-        });
+        // Initialize Prediction Chart
+        this.initializePredictionChart();
     }
 
     getStatusData() {
@@ -332,6 +240,27 @@ class NurogensisSystem {
         const week4 = baseRate + Math.floor(Math.random() * 3);
         
         return [week1, week2, week3, week4];
+    }
+
+    refreshSensorChart() {
+        console.log('Refreshing sensor chart...');
+        if (this.charts.sensor) {
+            this.charts.sensor.destroy();
+        }
+        this.initializeSensorChart();
+    }
+
+    refreshPredictionChart() {
+        console.log('Refreshing prediction chart...');
+        if (this.charts.prediction) {
+            this.charts.prediction.destroy();
+        }
+        this.initializePredictionChart();
+    }
+
+    refreshAllCharts() {
+        console.log('Refreshing all charts...');
+        this.updateCharts();
     }
 
     updateSensorDisplay() {
@@ -497,41 +426,118 @@ class NurogensisSystem {
             this.charts.health.update();
         }
 
-        // Update sensor chart based on actual equipment data
+        // COMPLETELY REINITIALIZE sensor chart based on actual equipment data
         if (this.charts.sensor) {
-            if (this.equipmentData.length === 0) {
-                // No equipment - show zero data
-                this.temperatureData = Array(20).fill(0);
-                this.vibrationData = Array(20).fill(0);
-            } else {
-                // Shift data to the left and add new data point based on equipment
-                this.temperatureData.shift();
-                this.vibrationData.shift();
-                
-                // Calculate average sensor values from all equipment
-                const avgTemp = this.equipmentData.reduce((sum, eq) => sum + eq.temperature, 0) / this.equipmentData.length;
-                const avgVibration = this.equipmentData.reduce((sum, eq) => sum + eq.vibration, 0) / this.equipmentData.length;
-                
-                // Add slight variation to the averages for realistic data
-                this.temperatureData.push(avgTemp + (Math.random() - 0.5) * 5);
-                this.vibrationData.push(avgVibration + (Math.random() - 0.5) * 0.5);
-            }
-            
-            // Update chart data
-            this.charts.sensor.data.datasets[0].data = this.temperatureData;
-            this.charts.sensor.data.datasets[1].data = this.vibrationData;
-            this.charts.sensor.update('none'); // No animation for smoother real-time feel
+            this.charts.sensor.destroy(); // Destroy existing chart
+            this.initializeSensorChart(); // Create new one with current data
         }
 
-        // Update prediction chart based on equipment health
+        // COMPLETELY REINITIALIZE prediction chart based on equipment health
         if (this.charts.prediction) {
-            const predictedFailures = this.calculatePredictedFailures();
-            const maintenanceScheduled = this.calculateMaintenanceScheduled();
-            
-            this.charts.prediction.data.datasets[0].data = predictedFailures;
-            this.charts.prediction.data.datasets[1].data = maintenanceScheduled;
-            this.charts.prediction.update();
+            this.charts.prediction.destroy(); // Destroy existing chart
+            this.initializePredictionChart(); // Create new one with current data
         }
+    }
+
+    initializeSensorChart() {
+        const sensorCtx = document.getElementById('sensorChart').getContext('2d');
+        this.sensorDataPoints = Array.from({length: 20}, (_, i) => i + 1);
+        
+        // Initialize with current equipment data or zeros
+        if (this.equipmentData.length > 0) {
+            const avgTemp = this.equipmentData.reduce((sum, eq) => sum + eq.temperature, 0) / this.equipmentData.length;
+            const avgVibration = this.equipmentData.reduce((sum, eq) => sum + eq.vibration, 0) / this.equipmentData.length;
+            
+            this.temperatureData = Array.from({length: 20}, () => avgTemp + (Math.random() - 0.5) * 10);
+            this.vibrationData = Array.from({length: 20}, () => avgVibration + (Math.random() - 0.5) * 1);
+        } else {
+            this.temperatureData = Array(20).fill(0);
+            this.vibrationData = Array(20).fill(0);
+        }
+        
+        this.charts.sensor = new Chart(sensorCtx, {
+            type: 'line',
+            data: {
+                labels: this.sensorDataPoints.map(point => `${point}m`),
+                datasets: [{
+                    label: 'Temperature',
+                    data: this.temperatureData,
+                    borderColor: '#e74c3c',
+                    backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                    tension: 0.4
+                }, {
+                    label: 'Vibration',
+                    data: this.vibrationData,
+                    borderColor: '#f39c12',
+                    backgroundColor: 'rgba(243, 156, 18, 0.1)',
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: {
+                    duration: 750
+                },
+                scales: {
+                    x: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Time (minutes)'
+                        }
+                    },
+                    y: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Values'
+                        },
+                        beginAtZero: true
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    }
+                }
+            }
+        });
+    }
+
+    initializePredictionChart() {
+        const predictionCtx = document.getElementById('predictionChart').getContext('2d');
+        const initialPredictedFailures = this.calculatePredictedFailures();
+        const initialMaintenanceScheduled = this.calculateMaintenanceScheduled();
+        
+        this.charts.prediction = new Chart(predictionCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
+                datasets: [{
+                    label: 'Predicted Failures',
+                    data: initialPredictedFailures,
+                    backgroundColor: '#e74c3c'
+                }, {
+                    label: 'Maintenance Scheduled',
+                    data: initialMaintenanceScheduled,
+                    backgroundColor: '#f39c12'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        }
+                    }
+                }
+            }
+        });
     }
 
     startRealTimeUpdates() {
@@ -728,6 +734,24 @@ function refreshEquipmentList() {
 function exportData(format) {
     if (window.nurogensisSystem) {
         window.nurogensisSystem.exportData(format);
+    }
+}
+
+function refreshSensorChart() {
+    if (window.nurogensisSystem) {
+        window.nurogensisSystem.refreshSensorChart();
+    }
+}
+
+function refreshPredictionChart() {
+    if (window.nurogensisSystem) {
+        window.nurogensisSystem.refreshPredictionChart();
+    }
+}
+
+function refreshAllCharts() {
+    if (window.nurogensisSystem) {
+        window.nurogensisSystem.refreshAllCharts();
     }
 }
 
