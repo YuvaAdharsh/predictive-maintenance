@@ -1,25 +1,4 @@
-editEquipment(index) {
-                const equipment = this.equipmentData[index];
-                const newName = prompt('Enter new equipment name:', equipment.name);
-                if (newName && newName.trim()) {
-                    equipment.name = newName.trim();
-                    this.refreshEquipmentList();
-                    this.updateDashboard();
-                    this.updateCharts();
-                    this.updateSensorDisplay();
-                }
-            }
-
-            deleteEquipment(index) {
-                if (confirm('Are you sure you want to delete this equipment?')) {
-                    this.equipmentData.splice(index, 1);
-                    this.refreshEquipmentList();
-                    this.updateDashboard();
-                    this.updateCharts();
-                    this.updateSensorDisplay();
-                    console.log(`Equipment at index ${index} deleted successfully`);
-                }
-            }<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -382,6 +361,7 @@ editEquipment(index) {
 
         .status-active { background: #d5f4e6; color: #27ae60; }
         .status-maintenance { background: #fdeaa7; color: #f39c12; }
+        .status-due { background: #fdeaa7; color: #f39c12; }
         .status-critical { background: #fadbd8; color: #e74c3c; }
 
         .troubleshoot-content {
@@ -697,7 +677,6 @@ editEquipment(index) {
             }
 
             hideLoadingScreen() {
-                // Loading screen is now handled in the initialization
                 console.log('System ready - loading screen will be hidden automatically');
             }
 
@@ -726,6 +705,7 @@ editEquipment(index) {
                             location: 'Building 2',
                             status: 'Maintenance Due',
                             health: 76,
+                            temperature: 95,
                             vibration: 3.8,
                             pressure: 132,
                             purchaseDate: '2021-08-20',
@@ -747,9 +727,6 @@ editEquipment(index) {
                     ];
 
                     console.log('Equipment data loaded:', this.equipmentData.length, 'items');
-                    
-                    // Set missing temperature for EQ002
-                    this.equipmentData[1].temperature = 95;
                     
                     this.updateDashboard();
                     this.initializeCharts();
@@ -957,12 +934,12 @@ editEquipment(index) {
                     sensorCard.innerHTML = `
                         <h4>${equipment.name}</h4>
                         <div class="sensor-value" style="color: ${this.getHealthColor(equipment.health)}">
-                            ${equipment.health.toFixed(5)}%
+                            ${equipment.health.toFixed(1)}%
                         </div>
                         <div>Health Score</div>
                         <div style="margin-top: 10px; font-size: 0.9em; color: #7f8c8d;">
-                            Temp: ${equipment.temperature.toFixed(2)}°F | 
-                            Vibration: ${equipment.vibration.toFixed(5)} mm/s
+                            Temp: ${equipment.temperature.toFixed(1)}°F | 
+                            Vibration: ${equipment.vibration.toFixed(2)} mm/s
                         </div>
                     `;
                     sensorGrid.appendChild(sensorCard);
@@ -1019,7 +996,7 @@ editEquipment(index) {
                     const equipmentCard = document.createElement('div');
                     equipmentCard.className = 'equipment-card';
                     
-                    const statusClass = equipment.status.toLowerCase().replace(' ', '-');
+                    const statusClass = equipment.status.toLowerCase().replace(/\s+/g, '-');
                     
                     equipmentCard.innerHTML = `
                         <div class="equipment-info">
@@ -1028,9 +1005,9 @@ editEquipment(index) {
                                 Category: ${equipment.category} | Location: ${equipment.location}
                             </div>
                             <div class="equipment-details">
-                                Health: ${equipment.health.toFixed(5)}% | 
-                                Temp: ${equipment.temperature.toFixed(2)}°F | 
-                                Vibration: ${equipment.vibration.toFixed(5)} mm/s
+                                Health: ${equipment.health.toFixed(1)}% | 
+                                Temp: ${equipment.temperature.toFixed(1)}°F | 
+                                Vibration: ${equipment.vibration.toFixed(2)} mm/s
                             </div>
                         </div>
                         <div style="text-align: right;">
@@ -1064,11 +1041,12 @@ editEquipment(index) {
                 const equipmentList = document.getElementById('equipmentList');
                 equipmentList.innerHTML = '';
 
-                filtered.forEach((equipment, index) => {
+                filtered.forEach((equipment, originalIndex) => {
+                    const index = this.equipmentData.indexOf(equipment);
                     const equipmentCard = document.createElement('div');
                     equipmentCard.className = 'equipment-card';
                     
-                    const statusClass = equipment.status.toLowerCase().replace(' ', '-');
+                    const statusClass = equipment.status.toLowerCase().replace(/\s+/g, '-');
                     
                     equipmentCard.innerHTML = `
                         <div class="equipment-info">
@@ -1077,13 +1055,17 @@ editEquipment(index) {
                                 Category: ${equipment.category} | Location: ${equipment.location}
                             </div>
                             <div class="equipment-details">
-                                Health: ${equipment.health.toFixed(5)}% | 
-                                Temp: ${equipment.temperature.toFixed(2)}°F | 
-                                Vibration: ${equipment.vibration.toFixed(5)} mm/s
+                                Health: ${equipment.health.toFixed(1)}% | 
+                                Temp: ${equipment.temperature.toFixed(1)}°F | 
+                                Vibration: ${equipment.vibration.toFixed(2)} mm/s
                             </div>
                         </div>
                         <div style="text-align: right;">
                             <div class="status-badge status-${statusClass}">${equipment.status}</div>
+                            <div style="margin-top: 10px;">
+                                <button class="btn btn-primary" onclick="handleEditEquipment(${index})" style="padding: 5px 10px; font-size: 12px;">Edit</button>
+                                <button class="btn btn-secondary" onclick="handleDeleteEquipment(${index})" style="padding: 5px 10px; font-size: 12px; background: #e74c3c;">Delete</button>
+                            </div>
                         </div>
                     `;
                     
@@ -1101,7 +1083,7 @@ editEquipment(index) {
                 // Update health chart
                 if (this.charts.health) {
                     this.charts.health.data.labels = this.equipmentData.map(eq => eq.name);
-                    this.charts.health.data.datasets[0].data = this.equipmentData.map(eq => parseFloat(eq.health.toFixed(5)));
+                    this.charts.health.data.datasets[0].data = this.equipmentData.map(eq => parseFloat(eq.health.toFixed(1)));
                     this.charts.health.update();
                 }
 
@@ -1175,7 +1157,7 @@ editEquipment(index) {
                         totalEquipment: this.equipmentData.length,
                         activeEquipment: this.equipmentData.filter(eq => eq.status === 'Active').length,
                         maintenanceEquipment: this.equipmentData.filter(eq => eq.status === 'Maintenance Due').length,
-                        avgHealth: (this.equipmentData.reduce((sum, eq) => sum + eq.health, 0) / this.equipmentData.length).toFixed(5)
+                        avgHealth: (this.equipmentData.reduce((sum, eq) => sum + eq.health, 0) / this.equipmentData.length).toFixed(1)
                     }
                 };
 
@@ -1239,14 +1221,7 @@ editEquipment(index) {
         // Global handler functions for equipment management
         function handleEditEquipment(index) {
             console.log('Edit button clicked for index:', index);
-            console.log('Checking system state...');
-            console.log('window.nurogensisSystem exists:', !!window.nurogensisSystem);
-            
             if (window.nurogensisSystem) {
-                console.log('System found, checking methods...');
-                console.log('editEquipment method exists:', typeof window.nurogensisSystem.editEquipment);
-                console.log('Available methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(window.nurogensisSystem)));
-                
                 if (typeof window.nurogensisSystem.editEquipment === 'function') {
                     window.nurogensisSystem.editEquipment(index);
                 } else {
@@ -1261,14 +1236,7 @@ editEquipment(index) {
 
         function handleDeleteEquipment(index) {
             console.log('Delete button clicked for index:', index);
-            console.log('Checking system state...');
-            console.log('window.nurogensisSystem exists:', !!window.nurogensisSystem);
-            
             if (window.nurogensisSystem) {
-                console.log('System found, checking methods...');
-                console.log('deleteEquipment method exists:', typeof window.nurogensisSystem.deleteEquipment);
-                console.log('Available methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(window.nurogensisSystem)));
-                
                 if (typeof window.nurogensisSystem.deleteEquipment === 'function') {
                     window.nurogensisSystem.deleteEquipment(index);
                 } else {
@@ -1285,7 +1253,6 @@ editEquipment(index) {
         window.handleEditEquipment = handleEditEquipment;
         window.handleDeleteEquipment = handleDeleteEquipment;
 
-        // Remove the old global functions since we're using class methods now
         // Global functions for navigation and form management
         function showSection(sectionName) {
             // Hide all sections
